@@ -1,4 +1,4 @@
-# AI Email Operations Assistant
+# AI-Powered Email Automation System (Self-Hosted LLM + n8n)
 
 ## Architecture Diagram
 
@@ -114,3 +114,4 @@ This project demonstrates:
 ## Author
 
 Revanth
+

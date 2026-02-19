@@ -1,0 +1,354 @@
+{
+  "name": "AI Email Operations Assistant",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e6abed43-bb35-4305-a389-9cd8ec8b876f",
+      "name": "Test Email"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "be8f4934-ae09-48df-a8ad-0d777e87927f",
+              "name": "email_text",
+              "value": "Subject: Invoice #2026-001  Hello,  Please find attached invoice for January services. Payment due in 14 days.  Thanks, Accounting",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d3667ccf-543b-48fc-8d61-6c89edc4879d",
+      "name": "Prepare Email Input"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.1:8b\",\n  \"prompt\": \"You are an email classification agent.\\n\\nClassify the following email into one category: urgent, invoice, client, spam.\\n\\nAlso extract:\\n- priority (low, medium, high)\\n- short summary (1 sentence)\\n- action required (1 sentence)\\n\\nReturn ONLY valid JSON.\\n\\nEmail:\\n{{$json.email_text}}\",\n  \"stream\": false\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "b94f9538-2498-4f77-b6ae-a4be63cb6257",
+      "name": "AI Classification (Ollama)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2db89e2a-4674-42d0-9c09-f09862c375aa",
+              "name": "ai_raw",
+              "value": "={{$json.response}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "4d04eaaa-2b1d-40a0-b9dc-067be4c0d0de",
+      "name": "Extract AI Raw Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.ai_raw.trim();\n\n// Sometimes models wrap JSON in ```json ... ```\n// This removes those if present\nconst cleaned = raw\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\nreturn [\n  {\n    json: JSON.parse(cleaned)\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "ff006a40-4456-4543-bc9b-940bb63597ee",
+      "name": "Parse AI JSON Output"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "04bdacfc-523c-4aeb-8659-77cca55d5d62",
+              "leftValue": "={{$json.category}}",
+              "rightValue": "urgent",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "ec54245c-1104-4e76-af72-4d9b2084f05b",
+      "name": "Check: Is Urgent?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "37b7bbdd-f29c-4fc7-a15f-f0738a52da64",
+              "leftValue": "={{$json.category}}",
+              "rightValue": "invoice",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        96
+      ],
+      "id": "abb3b420-cffd-4824-81ee-2a0920efb23f",
+      "name": "Check: Is Invoice?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d8563925-212c-4360-9088-d37a70cfa702",
+              "name": "alert_type",
+              "value": "HIGH PRIORITY",
+              "type": "string"
+            },
+            {
+              "id": "c7640875-6818-4a97-90af-3957ce574281",
+              "name": "message",
+              "value": "=Urgent email detected!\n\nSummary: {{$json.short_summary}}\n\nAction required: {{$json.action_required}}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        -96
+      ],
+      "id": "a084089c-6cc8-45a4-b1dd-742e9c011a69",
+      "name": "Create Urgent Alert"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "62494d58-193a-430c-8283-d4b86283b2b9",
+              "name": "invoice_status",
+              "value": "Invoice detected",
+              "type": "string"
+            },
+            {
+              "id": "8b97591f-f516-4c78-8c7d-90796c2b0488",
+              "name": "invoice_summary",
+              "value": "={{$json.short_summary}}",
+              "type": "string"
+            },
+            {
+              "id": "9770ea47-05d4-432d-9923-4be90d3fecf9",
+              "name": "action_needed",
+              "value": "={{$json.action_required}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "7426e19d-36b6-4f46-9f23-e5dcff323b08",
+      "name": "Process Invoice"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.1:8b\",\n  \"prompt\": \"Write a professional email reply to the sender.\\n\\nContext:\\nCategory: {{$json.category}}\\nPriority: {{$json.priority}}\\nSummary: {{$json.short_summary}}\\nAction required: {{$json.action_required}}\\n\\nRules:\\n- Be polite and concise\\n- Confirm next steps\\n- Do not invent details\\n- End with: 'Best regards,'\\n\\nReturn ONLY the email reply text.\",\n  \"stream\": false\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1504,
+        -192
+      ],
+      "id": "b33ee040-124f-4e6b-bd0a-da16fcd7270d",
+      "name": "Generate Reply (Ollama)",
+      "alwaysOutputData": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Test Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Input": {
+      "main": [
+        [
+          {
+            "node": "AI Classification (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Classification (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Raw Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Raw Response": {
+      "main": [
+        [
+          {
+            "node": "Parse AI JSON Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI JSON Output": {
+      "main": [
+        [
+          {
+            "node": "Check: Is Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Is Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Create Urgent Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check: Is Invoice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Is Invoice?": {
+      "main": [
+        [
+          {
+            "node": "Process Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Urgent Alert": {
+      "main": [
+        [
+          {
+            "node": "Generate Reply (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "7702462b-c2c5-4f27-b7d3-ed6ea447af0b",
+  "meta": {
+    "instanceId": "10b2333d86b1fdd0c46707f24637bf63227e645c310a1b0e4b5a831955d8ef53"
+  },
+  "id": "Io3Kwimmf9BPq8ZF",
+  "tags": []
+}
